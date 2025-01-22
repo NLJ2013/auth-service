@@ -1,4 +1,10 @@
-import { ConflictException, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  InternalServerErrorException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { UsersService } from 'src/users/services/users.service';
 import { SignInDto } from '../dto/sign-in.dto';
 import { User } from 'src/users/models/user.model';
@@ -28,7 +34,11 @@ export class AuthService {
       }
       return user;
     } catch (error) {
-      throw new Error(
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException(
         `User with this email does not exist: ${dto.email}, ${error}`,
       );
     }
@@ -36,6 +46,10 @@ export class AuthService {
 
   async signUp(dto: SignUpDto) {
     try {
+      if (dto.password !== dto.confirmPassword) {
+        throw new BadRequestException('Passwords do not match');
+      }
+
       const user = await this.usersService.findUserByEmail(dto?.email);
       if (user) {
         throw new ConflictException(
@@ -56,7 +70,10 @@ export class AuthService {
 
       return { message: 'User created successfully' };
     } catch (error) {
-      if (error instanceof ConflictException) {
+      if (
+        error instanceof ConflictException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
       throw new InternalServerErrorException(`Error signing up: ${error}`);
