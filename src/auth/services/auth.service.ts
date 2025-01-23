@@ -20,19 +20,6 @@ export class AuthService {
 
   async signIn(dto: SignInDto) {
     try {
-      const user = await this.usersService.findUserByEmail(dto.email);
-      const userSecret = await this.usersService.findUserSecretByUserId(
-        user._id,
-      );
-      if (
-        !(await this.passwordHasherService.comparePassword(
-          dto.password,
-          userSecret.password,
-        ))
-      ) {
-        throw new UnauthorizedException('Invalid password');
-      }
-      return user;
     } catch (error) {
       if (error instanceof UnauthorizedException) {
         throw error;
@@ -46,7 +33,7 @@ export class AuthService {
 
   async signUp(dto: SignUpDto) {
     try {
-      if (dto.password !== dto.confirmPassword) {
+      if (dto?.password && dto?.password !== dto?.confirmPassword) {
         throw new BadRequestException('Passwords do not match');
       }
 
@@ -57,9 +44,7 @@ export class AuthService {
         );
       }
 
-      const hashedPassword = await this.passwordHasherService.hashPassword(
-        dto.password,
-      );
+      const hashedPassword = await this.generatePasswordHash(dto.password);
 
       const newUser: User = {
         name: dto.name,
@@ -78,5 +63,34 @@ export class AuthService {
       }
       throw new InternalServerErrorException(`Error signing up: ${error}`);
     }
+  }
+
+  async validateUser(email: string, password: string): Promise<User> {
+    const user: User = await this.usersService.findUserByEmail(email);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const userSecret = await this.usersService.findUserSecretByUserId(user._id);
+
+    if (!(await this.validatePassword(password, userSecret.password))) {
+      throw new UnauthorizedException('Invalid password');
+    }
+
+    return user;
+  }
+
+  private async generatePasswordHash(password: string): Promise<string> {
+    return await this.passwordHasherService.hashPassword(password);
+  }
+
+  private async validatePassword(
+    password: string,
+    secretPassword: string,
+  ): Promise<boolean> {
+    return await this.passwordHasherService.comparePassword(
+      password,
+      secretPassword,
+    );
   }
 }
