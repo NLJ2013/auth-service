@@ -3,30 +3,30 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { UsersService } from 'src/users/services/users.service';
-import { SignInDto } from '../dto/sign-in.dto';
 import { User } from 'src/users/models/user.model';
 import { SignUpDto } from '../dto/sign-up.dto';
 import { PasswordHasherService } from './password-hasher.service';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly passwordHasherService: PasswordHasherService,
+    private readonly jwtService: JwtService,
   ) {}
 
-  async signIn(dto: SignInDto) {
+  async signIn(user: User) {
     try {
+      const payload = { email: user.email, sub: user._id };
+      return {
+        access_token: this.jwtService.sign(payload),
+      };
     } catch (error) {
-      if (error instanceof UnauthorizedException) {
-        throw error;
-      }
-
       throw new InternalServerErrorException(
-        `User with this email does not exist: ${dto.email}, ${error}`,
+        `Error occurred signing in: ${error}`,
       );
     }
   }
@@ -51,9 +51,12 @@ export class AuthService {
         email: dto.email,
       };
 
-      await this.usersService.createUser(newUser, hashedPassword);
+      const createdUser = await this.usersService.createUser(
+        newUser,
+        hashedPassword,
+      );
 
-      return { message: 'User created successfully' };
+      return this.signIn(createdUser);
     } catch (error) {
       if (
         error instanceof ConflictException ||
@@ -68,13 +71,13 @@ export class AuthService {
   async validateUser(email: string, password: string): Promise<User> {
     const user: User = await this.usersService.findUserByEmail(email);
     if (!user) {
-      throw new UnauthorizedException('User not found');
+      throw new BadRequestException('User not found');
     }
 
     const userSecret = await this.usersService.findUserSecretByUserId(user._id);
 
     if (!(await this.validatePassword(password, userSecret.password))) {
-      throw new UnauthorizedException('Invalid password');
+      throw new BadRequestException('Invalid password');
     }
 
     return user;
