@@ -13,7 +13,7 @@ export class UsersService {
     @InjectModel(UserSecret.name) private userSecretModel: Model<UserSecret>,
   ) {}
 
-  async createUser(user: User, hashedPassword: string): Promise<User> {
+  async createUser(user: Partial<User>, hashedPassword: string): Promise<User> {
     try {
       const foundUser = await this.userModel
         .findOne({ email: user.email })
