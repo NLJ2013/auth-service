@@ -3,7 +3,7 @@ export default () => ({
   port: 3000,
   database: {
     uri:
-      process.env.HMT_DB_URI ||
+      process.env.DB_URI ||
       'mongodb://127.0.0.1:27017/njaydb?directConnection=true&serverSelectionTimeoutMS=2000',
   },
   namespace: process.env.NAMESPACE || 'development',
